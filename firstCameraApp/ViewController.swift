@@ -14,6 +14,10 @@ class ViewController: UIViewController, UIImagePickerControllerDelegate, UINavig
     @IBOutlet weak var cameraButton: UIButton!
     @IBOutlet weak var imageViewButton: UIImageView!
     
+    @IBOutlet weak var leftFilter: UIButton!
+    @IBOutlet weak var centerFilter: UIButton!
+    @IBOutlet weak var rightFilter: UIButton!
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
