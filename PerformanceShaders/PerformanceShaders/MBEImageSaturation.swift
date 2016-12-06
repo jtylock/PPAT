@@ -109,7 +109,6 @@ public class MBEImageSaturation : MPSUnaryImageKernel
             // Can't operate in-place, so fail immediately if we weren't given a copy allocator
             return false
         }
-
         if let sourceTexture = texture.memory {
             // Since we can't operate in-place, we have to invoke our copy allocator to get a suitable destination.
             // We could probably be much more efficient here by somehow keeping track of these textures in a pool

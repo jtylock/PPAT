@@ -16,10 +16,10 @@ let MBEMaxInflightBuffers = 3
 var vertexData:[Float32] =
 [
 //    x     y    z    w    s    t
-    -1.5,  1.5, 0.0, 1.0, 0.0, 0.0,
-    -1.5, -1.5, 0.0, 1.0, 0.0, 1.0,
-     1.5,  1.5, 0.0, 1.0, 1.0, 0.0,
-     1.5, -1.5, 0.0, 1.0, 1.0, 1.0,
+    -1.4,  1.6, 0.0, 1.0, 0.0, 0.0,
+    -1.4, -1.6, 0.0, 1.0, 0.0, 1.0,
+     1.4,  1.6, 0.0, 1.0, 1.0, 0.0,
+     1.4, -1.6, 0.0, 1.0, 1.0, 1.0,
 ]
 
 // This copying allocator can be used by certain Metal Performance Shader kernels
@@ -68,8 +68,9 @@ class MBEViewController:UIViewController, MTKViewDelegate, UIImagePickerControll
     }
 
     func buildKernels() {
-        gaussianBlurKernel = MPSImageLaplacian(device: device)
-        thresholdKernel = MPSImageThresholdToZero(device: device, thresholdValue: 0.5, linearGrayColorTransform: nil)
+        
+        gaussianBlurKernel = MPSImageAreaMin(device: device, kernelWidth: 11, kernelHeight: 11)
+        thresholdKernel = MPSImageThresholdToZero(device: device, thresholdValue: 0.4, linearGrayColorTransform: nil)
         edgeKernel = MPSImageSobel(device: device)
         saturationKernel = MBEImageSaturation(device: device, saturationFactor: 0)
         selectedKernel = saturationKernel
