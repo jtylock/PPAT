@@ -16,10 +16,10 @@ let MBEMaxInflightBuffers = 3
 var vertexData:[Float32] =
 [
 //    x     y    z    w    s    t
-    -1.0,  1.0, 0.0, 1.0, 0.0, 0.0,
-    -1.0, -1.0, 0.0, 1.0, 0.0, 1.0,
-     1.0,  1.0, 0.0, 1.0, 1.0, 0.0,
-     1.0, -1.0, 0.0, 1.0, 1.0, 1.0,
+    -1.5,  1.5, 0.0, 1.0, 0.0, 0.0,
+    -1.5, -1.5, 0.0, 1.0, 0.0, 1.0,
+     1.5,  1.5, 0.0, 1.0, 1.0, 0.0,
+     1.5, -1.5, 0.0, 1.0, 1.0, 1.0,
 ]
 
 // This copying allocator can be used by certain Metal Performance Shader kernels
@@ -51,12 +51,10 @@ class MBEViewController:UIViewController, MTKViewDelegate, UIImagePickerControll
     var saturationKernel: MBEImageSaturation!
     var filterImage:UIImage!
     var selectedKernel: MPSUnaryImageKernel!
-
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-
         assert(MPSSupportsMTLDevice(device), "This device does not support Metal Performance Shaders")
-
         let view = self.view as! MTKView
         view.device = device
         view.delegate = self
@@ -70,24 +68,20 @@ class MBEViewController:UIViewController, MTKViewDelegate, UIImagePickerControll
     }
 
     func buildKernels() {
-        gaussianBlurKernel = MPSImageGaussianBlur(device: device, sigma: 3.0)
+        gaussianBlurKernel = MPSImageLaplacian(device: device)
         thresholdKernel = MPSImageThresholdToZero(device: device, thresholdValue: 0.5, linearGrayColorTransform: nil)
         edgeKernel = MPSImageSobel(device: device)
         saturationKernel = MBEImageSaturation(device: device, saturationFactor: 0)
-
         selectedKernel = saturationKernel
     }
 
     func loadAssets() {
-        
         let view = self.view as! MTKView
         commandQueue = device.newCommandQueue()
         commandQueue.label = "Command queue"
-        
         let defaultLibrary = device.newDefaultLibrary()!
         let vertexProgram = defaultLibrary.newFunctionWithName("project_vertex")!
         let fragmentProgram = defaultLibrary.newFunctionWithName("texture_fragment")!
-
         let pipelineStateDescriptor = MTLRenderPipelineDescriptor()
         pipelineStateDescriptor.vertexDescriptor = MBECreateVertexDescriptor()
         pipelineStateDescriptor.vertexFunction = vertexProgram
@@ -101,9 +95,9 @@ class MBEViewController:UIViewController, MTKViewDelegate, UIImagePickerControll
         sampler = device.newSamplerStateWithDescriptor(samplerDescriptor)
 
         let textureLoader = MTKTextureLoader(device: device)
-
+       
         do {
-            if let image = filterImage.flippedImage().CGImage {
+            if let image = filterImage.flippedImage().flippedImage().CGImage, let image2 = filterImage.flippedImage().CGImage{
                 try kernelSourceTexture = textureLoader.newTextureWithCGImage(image, options: nil)
                 kernelDestTexture = device.newTextureWithDescriptor(kernelSourceTexture!.matchingDescriptor())
             } else {
@@ -120,7 +114,7 @@ class MBEViewController:UIViewController, MTKViewDelegate, UIImagePickerControll
             print("Failed to create pipeline state, error \(error)")
         }
         
-        
+
         vertexBuffer = device.newBufferWithLength(MBEVertexDataSize * MBEMaxInflightBuffers, options: [])
         vertexBuffer.label = "vertices"
         
@@ -189,13 +183,10 @@ class MBEViewController:UIViewController, MTKViewDelegate, UIImagePickerControll
     }
     
     func drawInMTKView(view: MTKView) {
-
+        
         dispatch_semaphore_wait(inflightSemaphore, DISPATCH_TIME_FOREVER)
-        
         updateBuffers()
-        
         let commandBuffer = commandQueue.commandBuffer()
-
         commandBuffer.addCompletedHandler{ [weak self] commandBuffer in
             if let strongSelf = self {
                 dispatch_semaphore_signal(strongSelf.inflightSemaphore)
@@ -214,24 +205,19 @@ class MBEViewController:UIViewController, MTKViewDelegate, UIImagePickerControll
         {
             let clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
             renderPassDescriptor.colorAttachments[0].clearColor = clearColor
-
             let renderEncoder = commandBuffer.renderCommandEncoderWithDescriptor(renderPassDescriptor)
             renderEncoder.label = "Main pass"
-
             renderEncoder.pushDebugGroup("Draw textured square")
             renderEncoder.setFrontFacingWinding(.CounterClockwise)
             renderEncoder.setCullMode(.Back)
-
             renderEncoder.setRenderPipelineState(pipelineState)
             renderEncoder.setVertexBuffer(vertexBuffer, offset: MBEVertexDataSize * bufferIndex, atIndex: 0)
             renderEncoder.setVertexBuffer(uniformBuffer, offset: MBEUniformDataSize * bufferIndex , atIndex: 1)
             renderEncoder.setFragmentTexture(kernelDestTexture, atIndex: 0)
             renderEncoder.setFragmentSamplerState(sampler, atIndex: 0)
             renderEncoder.drawPrimitives(.TriangleStrip, vertexStart: 0, vertexCount: 4)
-
             renderEncoder.popDebugGroup()
             renderEncoder.endEncoding()
-                
             commandBuffer.presentDrawable(currentDrawable)
         }
         
